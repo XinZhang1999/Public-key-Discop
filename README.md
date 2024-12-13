@@ -63,7 +63,4 @@ If you need to deploy on different types of curves, we provide the core code for
 
 ### Change Model
 
-To change the model to llama2-7B, modify the code in `src/run_single_example.py` by setting the model_name as follows:
-
-```python
-settings.model_name = "llama2"
+The complete code will be released later.
