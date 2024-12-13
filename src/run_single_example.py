@@ -3,16 +3,38 @@ from typing import Optional
 import torch
 # from scipy.io.wavfile import read, write
 # from PIL import Image
+import argparse
 
 from config import Settings, text_default_settings, image_default_settings, audio_default_settings
 from model import get_model, get_feature_extractor, get_tokenizer
 from utils import SingleExampleOutput, check_dir
-import PRNEncryption
-from PRNEncryption import PRNEncryption
 
 
+import importlib
 
-def run_single_example(message, settings: Settings = text_default_settings, context: Optional[str] = None):
+def import_curve_class(curve: str):
+    try:
+        if curve.lower() == "p256":
+            module = importlib.import_module("PRNEncryption_P256")
+            PRNEncryption = getattr(module, "PRNEncryption_P256")
+        elif curve.lower() == "p384":
+            module = importlib.import_module("PRNEncryption_P384")
+            PRNEncryption = getattr(module, "PRNEncryption_P384")
+        elif curve.lower() == "secp256k1":
+            module = importlib.import_module("PRNEncryption_SECP256k1")
+            PRNEncryption = getattr(module, "PRNEncryption_SECP256k1")
+        else:
+            raise ValueError(f"Unsupported curve: {curve}. Valid options are p256, p384, secp256k1.")
+    except ModuleNotFoundError as e:
+        print(f"Module not found: {e}")
+        raise
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        raise
+    return PRNEncryption
+
+def run_single_example(message, curve: str, settings: Settings = text_default_settings, context: Optional[str] = None):
+    PRNEncryption = import_curve_class(curve)
     E = PRNEncryption()  # Pseudorandom Public-key ECC encryption scheme (satisfied IND$-CPA property) based on admissible encoding
     S = ''
     ciphertext = E.encrypt(message)
@@ -55,15 +77,13 @@ def run_single_example(message, settings: Settings = text_default_settings, cont
         print("m =",m)
 
 if __name__ == '__main__':
+    # curve in ['p256', 'p384', 'secp256k1']
+    curve = 'secp256k1' 
     message = "Attack at 9:00"
-    # Text Generation
     settings = text_default_settings
-    # Can change to Llama2 by 
-    # settings.model_name = llama2
-    settings.model_name = 'gpt2'  
-    
+    settings.model_name = 'gpt2-large'
     settings.device = torch.device('cuda:0')
-    # settings.algo = 'Discop_baseline'
     settings.algo = 'Discop'
     context = """Years later, he would find himself"""
-    run_single_example(message, settings, context)
+
+    run_single_example(message, curve, settings, context)

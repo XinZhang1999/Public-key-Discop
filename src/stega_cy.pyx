@@ -247,7 +247,7 @@ cdef CySingleEncodeStepOutput cy_baseline_encode_step(list indices, list probs, 
         rotate_step_size = 2.0**-capacity
         is_available = True
         tbl_new = {}
-        for i in range(2**capacity):
+        for i in range(int(2**capacity)):
             ptr_i = ptr + i * rotate_step_size
             if ptr_i >= 1.0:
                 ptr_i -= 1
