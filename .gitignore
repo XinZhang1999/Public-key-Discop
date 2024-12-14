@@ -1,0 +1,29 @@
+# 忽略 Python 编译产生的文件
+*.py[cod]
+__pycache__/
+*.pyo
+*.pyd
+
+# 忽略 Jupyter Notebook 的检查点文件
+.ipynb_checkpoints/
+
+# 忽略系统产生的文件
+.DS_Store  # macOS
+Thumbs.db  # Windows
+
+# 忽略 IDE 和编辑器产生的文件
+.vscode/
+.idea/
+*.swp
+
+# 忽略临时文件夹和文件
+*.tmp
+*.log
+*.bak
+*.cache
+
+# 忽略你项目中的特定临时文件
+dir/._____temp/
+
+# 你希望忽略的其他特定文件或目录
+build/
