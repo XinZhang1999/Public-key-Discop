@@ -278,6 +278,7 @@ P_256_B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
 P_256 = EllipticCurve(P_256_FIELD_SIZE, P_256_A, P_256_B)
 P_256_G = (0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296, 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5, 1)
 P_256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+K = 256
 
 def forward_map(u):
     """Forward mapping function
@@ -425,7 +426,7 @@ def decode(u, v):
     P = P_256.affine(P)
     return fe(P[0]), fe(P[1])
 
-class PRNEncryption_P256:
+class PRNEncryption_SECP256k1:
     '''
     IND$-CPA secure pseudorandom public-key encryption using admissible encoding.
     Launch on P_256 using SWU.
@@ -445,8 +446,8 @@ class PRNEncryption_P256:
     def generate_random_bytes(self, num_bytes):
         return secrets.token_bytes(num_bytes)
 
-    def encode_bytes(self, x, P, LT):
-        k = secrets.randbelow((P * (2 ** LT) - x) // P)
+    def encode_bytes(self, x, P, LT, K):
+        k = secrets.randbelow(((2 ** K) * (2 ** LT) - x) // P)
         return x + k * P
 
     def decode_bytes(self, enc, P, LT):
@@ -466,8 +467,8 @@ class PRNEncryption_P256:
         u, v = encode(ge, random_bytes)
         
         # Bias Eliminating
-        u_ = self.encode_bytes(u.val, P_256.p, self.LT)
-        v_ = self.encode_bytes(v.val, P_256.p, self.LT)
+        u_ = self.encode_bytes(u.val, P_256.p, self.LT, self.bitlength)
+        v_ = self.encode_bytes(v.val, P_256.p, self.LT, self.bitlength)
         
         cipher = AES.new(self.aes_key, AES.MODE_CBC)
         self.nonce = cipher.iv
@@ -507,10 +508,11 @@ if args.generate_bit:
 else:
     generate_bit = False
 
+from tqdm import tqdm
 
 if __name__ == '__main__':
     if not generate_bit:
-        encryption_system = PRNEncryption_P256()
+        encryption_system = PRNEncryption_SECP256k1()
         message = "Attack at 9:00"
         ciphertext = encryption_system.encrypt(message)
         print(f"Ciphertext: {ciphertext.hex()}")
@@ -519,17 +521,19 @@ if __name__ == '__main__':
         assert message == decrypted_message, "Decryption failed!"
         print("Encryption and decryption succeeded.")
     else:
-        encryption_system = PRNEncryption_P256()
-        output_file = "prn_test_data.bin"
+        encryption_system = PRNEncryption_SECP256k1()
+        output_file = "prn_test_data"
         num_bits = 100_000_000
         num_bytes = num_bits // 8
-        with open(output_file, "wb") as f:
-            bytes_written = 0
-            while bytes_written < num_bytes:
-                message = f"Message {bytes_written}"  
-                ciphertext = encryption_system.encrypt(message)
-                prn_data = ciphertext[:min(len(ciphertext), num_bytes - bytes_written)]
-                f.write(prn_data)
-                bytes_written += len(prn_data)
+        with tqdm(total=num_bytes, unit='B', unit_scale=True, desc="Writing PRN Data") as pbar:
+            with open(output_file, "wb") as f:
+                bytes_written = 0
+                while bytes_written < num_bytes:
+                    message = f"Message {bytes_written}"  
+                    ciphertext = encryption_system.encrypt(message)
+                    prn_data = ciphertext[:min(len(ciphertext), num_bytes - bytes_written)]
+                    f.write(prn_data)
+                    bytes_written += len(prn_data)
+                    pbar.update(len(prn_data))
         print(f"Generated {num_bits} bits of pseudorandom data and saved to {output_file}")
 
