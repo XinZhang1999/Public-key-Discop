@@ -457,8 +457,8 @@ class PRNEncryption_SECP256k1:
     def generate_random_bytes(self, num_bytes):
         return secrets.token_bytes(num_bytes)
 
-    def encode_bytes(self, x, P, LT):
-        k = secrets.randbelow((P * (2 ** LT) - x) // P)
+    def encode_bytes(self, x, P, LT, K):
+        k = secrets.randbelow(((2 ** K) * (2 ** LT) - x) // P)
         return x + k * P
 
     def decode_bytes(self, enc, P, LT):
@@ -478,8 +478,8 @@ class PRNEncryption_SECP256k1:
         u, v = encode(ge, random_bytes)
         
         # Bias Eliminating
-        u_ = self.encode_bytes(u.val, SECP256K1.p, self.LT)
-        v_ = self.encode_bytes(v.val, SECP256K1.p, self.LT)
+        u_ = self.encode_bytes(u.val, SECP256K1.p, self.LT, self.bitlength)
+        v_ = self.encode_bytes(v.val, SECP256K1.p, self.LT, self.bitlength)
         
         cipher = AES.new(self.aes_key, AES.MODE_CBC)
         self.nonce = cipher.iv
@@ -509,6 +509,8 @@ def save_bytes_as_binary_text(ciphertext, filename='message.txt'):
             file.write('0' if bit == '0' else '1')
 
 import argparse
+from tqdm import tqdm
+
 
 generate_bit = False
 parser = argparse.ArgumentParser()
@@ -531,16 +533,18 @@ if __name__ == '__main__':
         print("Encryption and decryption succeeded.")
     else:
         encryption_system = PRNEncryption_SECP256k1()
-        output_file = "prn_test_data.bin"
+        output_file = "prn_test_data"
         num_bits = 100_000_000
         num_bytes = num_bits // 8
-        with open(output_file, "wb") as f:
-            bytes_written = 0
-            while bytes_written < num_bytes:
-                message = f"Message {bytes_written}"  
-                ciphertext = encryption_system.encrypt(message)
-                prn_data = ciphertext[:min(len(ciphertext), num_bytes - bytes_written)]
-                f.write(prn_data)
-                bytes_written += len(prn_data)
+        with tqdm(total=num_bytes, unit='B', unit_scale=True, desc="Writing PRN Data") as pbar:
+            with open(output_file, "wb") as f:
+                bytes_written = 0
+                while bytes_written < num_bytes:
+                    message = f"Message {bytes_written}"  
+                    ciphertext = encryption_system.encrypt(message)
+                    prn_data = ciphertext[:min(len(ciphertext), num_bytes - bytes_written)]
+                    f.write(prn_data)
+                    bytes_written += len(prn_data)
+                    pbar.update(len(prn_data))
         print(f"Generated {num_bits} bits of pseudorandom data and saved to {output_file}")
 
