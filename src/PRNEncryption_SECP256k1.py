@@ -540,7 +540,7 @@ if __name__ == '__main__':
             with open(output_file, "wb") as f:
                 bytes_written = 0
                 while bytes_written < num_bytes:
-                    message = f"Message {bytes_written}"  
+                    message = f"Message"  
                     ciphertext = encryption_system.encrypt(message)
                     prn_data = ciphertext[:min(len(ciphertext), num_bytes - bytes_written)]
                     f.write(prn_data)
