@@ -282,7 +282,7 @@ class EllipticCurve:
         ps is a list of (Jacobian tuple, scalar) pairs.
         """
         r = (0, 1, 0)
-        for i in range(255, -1, -1):
+        for i in range(383, -1, -1):
             r = self.double(r)
             for (p, n) in ps:
                 if ((n >> i) & 1):
