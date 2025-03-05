@@ -431,6 +431,7 @@ def decode(u, v):
 class PRNEncryption_P384:
     '''
     IND$-CPA secure pseudorandom public-key encryption using admissible encoding.
+    Launch on P_384 using Icart.
     '''
     def __init__(self):
         self.curve = P_384
