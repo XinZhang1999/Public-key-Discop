@@ -2,6 +2,8 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import hashlib
 import secrets
+from Crypto.Util import Counter
+
 
 def modinv(a, n):
     """
@@ -381,7 +383,6 @@ def encode(P, randombytes):
         SHA256("P-256_ellsq_encode\x00" + uint32{count} + rnd32 + X + byte{Y & 1})
         '''
         # Random field element u and random number j is extracted from
-        # SHA256("secp256k1_ellsq_encode\x00" + uint32{count} + rnd32 + X + byte{Y & 1})
         m = hashlib.sha256()
         m.update(b"P-256_ellsq_encode\x00")
         m.update(count.to_bytes(4, 'little'))
@@ -426,7 +427,7 @@ def decode(u, v):
     P = P_256.affine(P)
     return fe(P[0]), fe(P[1])
 
-class PRNEncryption_SECP256k1:
+class PRNEncryption_P256:
     '''
     IND$-CPA secure pseudorandom public-key encryption using admissible encoding.
     Launch on P_256 using SWU.
@@ -439,6 +440,7 @@ class PRNEncryption_SECP256k1:
         self.LT = 32
         self.bitlength = 256
         self.pointbytes = (self.bitlength + self.LT) // 8
+        self.ctr = Counter.new(128)
         
     def set_redundancy(self, t):
         self.LT = t
@@ -459,7 +461,7 @@ class PRNEncryption_SECP256k1:
         P = P_256.affine(P_256.mul([(P_256_G, a)]))
         x, y, z = P
         point_bytes = x.to_bytes(32, 'big') + y.to_bytes(32, 'big') + z.to_bytes(32, 'big')
-        self.aes_key = hashlib.sha256(point_bytes).digest()
+        aes_key = hashlib.sha256(point_bytes).digest()
         
         # Point Hiding
         ge = (P[0], P[1], P[2])
@@ -470,10 +472,9 @@ class PRNEncryption_SECP256k1:
         u_ = self.encode_bytes(u.val, P_256.p, self.LT, self.bitlength)
         v_ = self.encode_bytes(v.val, P_256.p, self.LT, self.bitlength)
         
-        cipher = AES.new(self.aes_key, AES.MODE_CBC)
-        self.nonce = cipher.iv
+        cipher = AES.new(aes_key, AES.MODE_CTR, counter=self.ctr)
         ciphertext = cipher.encrypt(pad(plaintext.encode('utf-8'), AES.block_size))
-        return u_.to_bytes(self.pointbytes,'big') + v_.to_bytes(self.pointbytes,'big') + self.nonce + ciphertext 
+        return u_.to_bytes(self.pointbytes,'big') + v_.to_bytes(self.pointbytes,'big') + ciphertext 
 
     def decrypt(self, ciphertext):
         u_ = int.from_bytes(ciphertext[:self.pointbytes],'big')
@@ -483,11 +484,9 @@ class PRNEncryption_SECP256k1:
         x, y = decode(fe(u), fe(v))
         z = 1
         point_bytes = x.val.to_bytes(32, 'big') + y.val.to_bytes(32, 'big') + z.to_bytes(32, 'big')
-        self.aes_key = hashlib.sha256(point_bytes).digest()
-        
-        nonce = ciphertext[self.pointbytes * 2 : self.pointbytes * 2 + AES.block_size]
-        cipher = AES.new(self.aes_key, AES.MODE_CBC, nonce)
-        plaintext = unpad(cipher.decrypt(ciphertext[self.pointbytes * 2 + AES.block_size:]), AES.block_size)
+        aes_key = hashlib.sha256(point_bytes).digest()
+        cipher = AES.new(aes_key, AES.MODE_CTR, counter=self.ctr)        
+        plaintext = unpad(cipher.decrypt(ciphertext[self.pointbytes * 2:]), AES.block_size)
         return plaintext.decode('utf-8')
     
 def save_bytes_as_binary_text(ciphertext, filename='message.txt'):
@@ -512,7 +511,7 @@ from tqdm import tqdm
 
 if __name__ == '__main__':
     if not generate_bit:
-        encryption_system = PRNEncryption_SECP256k1()
+        encryption_system = PRNEncryption_P256()
         message = "Attack at 9:00"
         ciphertext = encryption_system.encrypt(message)
         print(f"Ciphertext: {ciphertext.hex()}")
@@ -521,9 +520,9 @@ if __name__ == '__main__':
         assert message == decrypted_message, "Decryption failed!"
         print("Encryption and decryption succeeded.")
     else:
-        encryption_system = PRNEncryption_SECP256k1()
-        output_file = "prn_test_data"
-        num_bits = 100_000_000
+        encryption_system = PRNEncryption_P256()
+        output_file = "output1"
+        num_bits = 8_000_000_000
         num_bytes = num_bits // 8
         with tqdm(total=num_bytes, unit='B', unit_scale=True, desc="Writing PRN Data") as pbar:
             with open(output_file, "wb") as f:
